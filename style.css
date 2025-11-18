@@ -1,0 +1,94 @@
+body {
+    margin: 0;
+    background: #1a1a1a;
+    font-family: sans-serif;
+    color: white;
+}
+
+/* Whole app is vertical */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Top section: left + right panels side-by-side */
+#main-panels {
+    display: grid;
+    grid-template-columns: 45% 55%;
+    flex: 1; /* take all available height except waveform */
+}
+
+/* Left panel */
+#left-panel {
+    overflow-y: auto;
+    border-right: 1px solid #333;
+}
+
+/* Right panel */
+#right-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Video container */
+#video-container {
+    flex: 1;
+    background: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Controls */
+#controls {
+    padding: 10px;
+    background: #222;
+    display: flex;
+    gap: 10px;
+}
+
+#controls button {
+    padding: 6px 12px;
+    background: #333;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+#controls button:hover {
+    background: #444;
+}
+
+/* Subtitle table */
+#subtitle-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+#subtitle-table th {
+    background: #222;
+    padding: 6px;
+    text-align: left;
+}
+
+#subtitle-table td {
+    padding: 6px;
+    border-bottom: 1px solid #333;
+}
+
+#waveform-container {
+    width: calc(100% - 40px);
+    margin: 0 auto 20px auto;
+    padding: 10px 0;
+    border-top: 1px solid #333;
+}
+
+#waveform {
+    height: 200px;
+}
+
+#timeline {
+    padding: 30px;
+}

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Subtitle Editor Prototype</title>
+    <link rel="stylesheet" href="style.css" />
+
+    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
+</head>
+
+<body>
+<div id="app">
+    <div id="main-panels">
+        <div id="left-panel">
+
+            <div id="top-loaders">
+                <label class="file-btn">
+                    Load Video
+                    <input type="file" id="video-input" accept="video/*">
+                </label>
+
+                <label class="file-btn">
+                    Load Subtitles
+                    <input type="file" id="sub-input" accept=".srt,.vtt">
+                </label>
+            </div>
+
+            <table id="subtitle-table">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Duration</th>
+                    <th>Text</th>
+                </tr>
+                </thead>
+                <tbody id="subs-body">
+                </tbody>
+            </table>
+        </div>
+
+        <div id="right-panel">
+            <div id="video-container">
+                <video id="video" controls></video>
+            </div>
+
+            <div id="controls">
+                <button id="play">Play</button>
+                <button id="play-current">Play Current</button>
+                <button id="insert">Insert</button>
+                <button id="autobreak">Auto-break</button>
+                <button id="unbreak">Un-break</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="timeline">
+        <div id="waveform"></div>
+    </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+
+</html>
