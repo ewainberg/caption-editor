@@ -211,6 +211,7 @@ function renderWaveformRegions(entries) {
     regionsPlugin.clearRegions();
 
     entries.forEach((cue, i) => {
+        const displayText = "#" + (i + 1) + "\t" + cue.text;
         const start = vttToMS(cue.start) / 1000;
         const end   = vttToMS(cue.end) / 1000;
 
@@ -220,7 +221,8 @@ function renderWaveformRegions(entries) {
             end,
             drag: true,
             resize: true,
-            color: "rgba(0, 150, 255, 0.3)"
+            color: "rgb(51, 4, 4, 0.3)",
+            content: displayText,
         });
 
         region.data = { index: i };
@@ -247,6 +249,17 @@ function bindWaveformEvents() {
         if (!wavesurfer) return;
         const ratio = video.currentTime / video.duration;
         wavesurfer.seekTo(ratio);
+
+        // Highlight the current region's row
+        const regions = regionsPlugin.getRegions();
+        const currentRegion = regions.find(r =>
+            video.currentTime >= r.start && video.currentTime < r.end
+        );
+        if (currentRegion && typeof currentRegion.data?.index === "number") {
+            highlightRow(currentRegion.data.index);
+        } else {
+            highlightRow(-1); // Remove highlight if not in any region
+        }
     });
 }
 

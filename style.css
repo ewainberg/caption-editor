@@ -92,3 +92,8 @@ body {
 #timeline {
     padding: 30px;
 }
+
+#subs-body tr.active-row {
+    background: #2a4a7a !important;
+    color: #fff;
+}
