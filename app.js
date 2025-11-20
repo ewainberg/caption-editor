@@ -24,7 +24,7 @@ function loadVideo(file) {
         container: '#waveform',
         waveColor: '#aaa',
         progressColor: '#fff',
-        height: 200,
+        height: 130,
         normalize: true,
         responsive: true,
         hideScrollbar: true,
@@ -234,7 +234,6 @@ function renderWaveformRegions(entries) {
 
         region.data = { index: i };
 
-        // Attach double-click handler directly to the region
         region.on("dblclick", (e) => {
             console.log("double click fired!", region);
 
@@ -246,13 +245,11 @@ function renderWaveformRegions(entries) {
                 const duration = wavesurfer.getDuration();
                 const pxPerSec = bbox.width / duration;
                 let clickTime = x / pxPerSec;
-                // Clamp to region bounds
                 if (clickTime < region.start) clickTime = region.start;
                 if (clickTime > region.end) clickTime = region.end;
                 seekTime = clickTime;
             }
-
-            selectSection(i, seekTime); // This seeks to the exact double-clicked place
+            selectSection(i, seekTime);
         });
     });
 }
@@ -278,7 +275,6 @@ function bindWaveformEvents() {
     });
 }
 
-// Helper to format seconds to VTT time string
 function formatTimeVTT(seconds) {
     const ms = Math.floor((seconds % 1) * 1000);
     const totalSeconds = Math.floor(seconds);
@@ -369,27 +365,24 @@ function selectSection(index, seekTime) {
     highlightRow(index);
     renderWaveformRegions(subtitles);
 
-    // Only seek if seekTime is provided (e.g., from region double-click)
+    // Only seek if seekTime is provided (from region double-click)
     if (typeof seekTime === "number") {
         const video = document.getElementById("video");
-        const wasPlaying = !video.paused; // Remember if it was playing
+        // Remember play state to avoid confusion
+        const wasPlaying = !video.paused;
 
         video.currentTime = seekTime;
 
-        // Sync waveform playhead
         if (wavesurfer && video.duration) {
             wavesurfer.seekTo(seekTime / video.duration);
         }
 
-        // Restore play/pause state
         if (wasPlaying) {
             video.play();
         } else {
             video.pause();
         }
     }
-
-    // Show editor
     const editor = document.getElementById("editor");
     editor.style.display = "flex";
     editor.dataset.index = index;
@@ -428,7 +421,6 @@ window.addEventListener("DOMContentLoaded", () => {
         const video = document.getElementById("video");
         if (!video.duration) return;
 
-        // Scroll up = forward, down = backward
         const delta = e.deltaY < 0 ? 1 : -1;
         // Seek by 1 second per scroll "tick"
         let newTime = video.currentTime + delta * 0.2;
@@ -463,7 +455,7 @@ window.addEventListener("DOMContentLoaded", () => {
     video.addEventListener("pause", updateBtn);
     updateBtn();
 
-    // --- Play Current Section Button ---
+    // Play Current Section Button
     const playCurrentBtn = document.getElementById("play-current");
     let stopAtEndHandler = null;
 
@@ -475,7 +467,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const video = document.getElementById("video");
 
-        // Remove any previous handler
         if (stopAtEndHandler) {
             video.removeEventListener("timeupdate", stopAtEndHandler);
         }
@@ -483,7 +474,7 @@ window.addEventListener("DOMContentLoaded", () => {
         // Always start at the section's start
         video.currentTime = start;
 
-        // --- Add this to sync waveform immediately ---
+        // Sync waveform immediately
         if (wavesurfer && video.duration) {
             wavesurfer.seekTo(start / video.duration);
         }
