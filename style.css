@@ -5,33 +5,28 @@ body {
     color: white;
 }
 
-/* Whole app is vertical */
 #app {
     display: flex;
     flex-direction: column;
     height: 100vh;
 }
 
-/* Top section: left + right panels side-by-side */
 #main-panels {
     display: grid;
     grid-template-columns: 45% 55%;
-    flex: 1; /* take all available height except waveform */
+    flex: 1;
 }
 
-/* Left panel */
 #left-panel {
     overflow-y: auto;
     border-right: 1px solid #333;
 }
 
-/* Right panel */
 #right-panel {
     display: flex;
     flex-direction: column;
 }
 
-/* Video container */
 #video-container {
     flex: 1;
     background: black;
@@ -40,7 +35,6 @@ body {
     justify-content: center;
 }
 
-/* Controls */
 #controls {
     padding: 10px;
     background: #222;
@@ -60,7 +54,25 @@ body {
     background: #444;
 }
 
-/* Subtitle table */
+#video-controls {
+    margin-top: 8px;
+    text-align: center;
+}
+
+#play-pause-btn {
+    padding: 6px 18px;
+    font-size: 1rem;
+    background: #333;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#play-pause-btn:hover {
+    background: #555;
+}
+
 #subtitle-table {
     width: 100%;
     border-collapse: collapse;

@@ -1,6 +1,7 @@
 let wavesurfer = null;
 let regionsPlugin = null;
 let subtitles = [];
+let selectedIndex = -1;
 
 /* --------------------------------------------------
    Video Loading
@@ -28,6 +29,7 @@ function loadVideo(file) {
         responsive: true,
         hideScrollbar: true,
         minPxPerSec: 100,
+        interact: false,
     });
     wavesurfer.setMuted(true);
 
@@ -188,6 +190,7 @@ function renderSubs(entries) {
     entries.forEach((e, i) => {
         const tr = document.createElement("tr");
         tr.dataset.index = i;
+        if (i === selectedIndex) tr.classList.add("active-row");
 
         tr.innerHTML = `
             <td>${e.index}</td>
@@ -197,7 +200,9 @@ function renderSubs(entries) {
             <td>${e.text}</td>
         `;
 
-        tr.addEventListener("click", () => onRowClick(i));
+        tr.addEventListener("click", () => {
+            selectSection(i);
+        });
         body.appendChild(tr);
     });
 }
@@ -223,11 +228,32 @@ function renderWaveformRegions(entries) {
             end,
             drag: true,
             resize: true,
-            color: "rgb(51, 4, 4, 0.3)",
             content: displayText,
+            color: i === selectedIndex ? "rgba(50,150,255,0.4)" : "rgba(100,100,100,0.2)"
         });
 
         region.data = { index: i };
+
+        // Attach double-click handler directly to the region
+        region.on("dblclick", (e) => {
+            console.log("double click fired!", region);
+
+            // Calculate the time at the double-click position
+            let seekTime = region.start;
+            if (e && wavesurfer) {
+                const bbox = wavesurfer.getWrapper().getBoundingClientRect();
+                const x = e.clientX - bbox.left;
+                const duration = wavesurfer.getDuration();
+                const pxPerSec = bbox.width / duration;
+                let clickTime = x / pxPerSec;
+                // Clamp to region bounds
+                if (clickTime < region.start) clickTime = region.start;
+                if (clickTime > region.end) clickTime = region.end;
+                seekTime = clickTime;
+            }
+
+            selectSection(i, seekTime); // This seeks to the exact double-clicked place
+        });
     });
 }
 
@@ -238,56 +264,16 @@ function renderWaveformRegions(entries) {
 
 function bindWaveformEvents() {
     if (!wavesurfer || !regionsPlugin) return;
-
-    regionsPlugin.on('region-clicked', (region) => {
-        const video = document.getElementById("video");
-        video.currentTime = region.start;
-        video.play();
-        highlightRow(region.data?.index ?? 0);
-    });
-
-    // Listen for region updates (drag/resize)
     regionsPlugin.on('region-updated', (region) => {
+        console.log("Region updated:", region);
         const idx = region.data?.index;
         if (typeof idx === "number" && subtitles[idx]) {
-            // Update subtitle start/end times
-            const start = region.start;
-            const end = region.end;
-
-            // Format to VTT time (hh:mm:ss.mmm)
-            subtitles[idx].start = formatTimeVTT(start);
-            subtitles[idx].end = formatTimeVTT(end);
+            subtitles[idx].start = formatTimeVTT(region.start);
+            subtitles[idx].end = formatTimeVTT(region.end);
             subtitles[idx].duration = computeVTTDuration(subtitles[idx].start, subtitles[idx].end);
-
             renderSubs(subtitles);
+            renderWaveformRegions(subtitles);
             updateVideoTrack();
-
-            // If this region is currently selected in the editor, update the editor fields
-            const editor = document.getElementById("editor");
-            if (editor.dataset.index == idx) {
-                // Only update if the editor is showing this cue
-                document.getElementById("edit-text").value = subtitles[idx].text;
-            }
-        }
-    });
-
-    const video = document.getElementById("video");
-    video.addEventListener('timeupdate', () => {
-        if (!wavesurfer) return;
-        const ratio = video.currentTime / video.duration;
-        wavesurfer.seekTo(ratio);
-
-        const regions = regionsPlugin.getRegions();
-        const currentRegion = regions.find(r =>
-            video.currentTime >= r.start && video.currentTime < r.end
-        );
-        if (currentRegion && typeof currentRegion.data?.index === "number") {
-            highlightRow(currentRegion.data.index);
-        } else {
-            // Only clear highlight if video is playing
-            if (!video.paused) {
-                highlightRow(-1);
-            }
         }
     });
 }
@@ -376,13 +362,143 @@ function highlightRow(i) {
     const rows = document.querySelectorAll("#subs-body tr");
     rows.forEach(r => r.classList.remove("active-row"));
     if (rows[i]) rows[i].classList.add("active-row");
-
-    const editor = document.getElementById("editor");
-    if (i >= 0 && subtitles[i]) {
-        editor.dataset.index = i;
-        document.getElementById("edit-text").value = subtitles[i].text;
-    } else {
-        editor.dataset.index = "";
-        document.getElementById("edit-text").value = "";
-    }
 }
+
+function selectSection(index, seekTime) {
+    selectedIndex = index;
+    highlightRow(index);
+    renderWaveformRegions(subtitles);
+
+    // Only seek if seekTime is provided (e.g., from region double-click)
+    if (typeof seekTime === "number") {
+        const video = document.getElementById("video");
+        const wasPlaying = !video.paused; // Remember if it was playing
+
+        video.currentTime = seekTime;
+
+        // Sync waveform playhead
+        if (wavesurfer && video.duration) {
+            wavesurfer.seekTo(seekTime / video.duration);
+        }
+
+        // Restore play/pause state
+        if (wasPlaying) {
+            video.play();
+        } else {
+            video.pause();
+        }
+    }
+
+    // Show editor
+    const editor = document.getElementById("editor");
+    editor.style.display = "flex";
+    editor.dataset.index = index;
+    document.getElementById("edit-text").value = subtitles[index].text;
+}
+
+// For testing purposes, load default video and subtitles on startup
+window.addEventListener("DOMContentLoaded", () => {
+    const defaultVideoPath = "test.mp4";
+    const defaultVttPath = "test.vtt";
+
+    fetch(defaultVideoPath)
+        .then(response => response.blob())
+        .then(blob => {
+            loadVideo(new File([blob], defaultVideoPath, { type: "video/mp4" }));
+        });
+
+    fetch(defaultVttPath)
+        .then(response => response.text())
+        .then(text => {
+            subtitles = parseVTT(text);
+            attachTrackToVideo(text);
+            renderSubs(subtitles);
+            renderWaveformRegions(subtitles);
+
+            const editor = document.getElementById("editor");
+            editor.style.display = "flex";
+            editor.dataset.index = "";
+            document.getElementById("edit-text").value = "";
+        });
+
+    // Add mouse wheel seeking on waveform
+    const waveform = document.getElementById("waveform");
+    waveform.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const video = document.getElementById("video");
+        if (!video.duration) return;
+
+        // Scroll up = forward, down = backward
+        const delta = e.deltaY < 0 ? 1 : -1;
+        // Seek by 1 second per scroll "tick"
+        let newTime = video.currentTime + delta * 0.2;
+        newTime = Math.max(0, Math.min(video.duration, newTime));
+        video.currentTime = newTime;
+
+        // Sync waveform playhead
+        if (wavesurfer) {
+            wavesurfer.seekTo(newTime / video.duration);
+        }
+    }, { passive: false });
+
+    // Play/Pause button logic
+    const video = document.getElementById("video");
+    const playPauseBtn = document.getElementById("play-pause-btn");
+    if (!video || !playPauseBtn) return;
+
+    function updateBtn() {
+        playPauseBtn.textContent = video.paused ? "▶️" : "⏸️";
+    }
+
+    playPauseBtn.addEventListener("click", () => {
+        if (video.paused) {
+            video.play();
+        } else {
+            video.pause();
+        }
+        updateBtn();
+    });
+
+    video.addEventListener("play", updateBtn);
+    video.addEventListener("pause", updateBtn);
+    updateBtn();
+
+    // --- Play Current Section Button ---
+    const playCurrentBtn = document.getElementById("play-current");
+    let stopAtEndHandler = null;
+
+    playCurrentBtn.addEventListener("click", () => {
+        if (selectedIndex < 0 || !subtitles[selectedIndex]) return;
+        const cue = subtitles[selectedIndex];
+        const start = vttToMS(cue.start) / 1000;
+        const end = vttToMS(cue.end) / 1000;
+
+        const video = document.getElementById("video");
+
+        // Remove any previous handler
+        if (stopAtEndHandler) {
+            video.removeEventListener("timeupdate", stopAtEndHandler);
+        }
+
+        // Always start at the section's start
+        video.currentTime = start;
+
+        // --- Add this to sync waveform immediately ---
+        if (wavesurfer && video.duration) {
+            wavesurfer.seekTo(start / video.duration);
+        }
+
+        video.play();
+
+        stopAtEndHandler = function stopAtEnd() {
+            if (video.currentTime >= end) {
+                video.pause();
+                video.removeEventListener("timeupdate", stopAtEndHandler);
+                stopAtEndHandler = null;
+            }
+        };
+        video.addEventListener("timeupdate", stopAtEndHandler);
+    });
+
+    document.getElementById("video").removeAttribute("controls");
+});
