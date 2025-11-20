@@ -31,14 +31,10 @@ function loadVideo(file) {
     });
     wavesurfer.setMuted(true);
 
-    // Register timeline plugin
     wavesurfer.registerPlugin(
-        WaveSurfer.Timeline.create({
-            timeInterval: 1,
-        })
+        WaveSurfer.Timeline.create({ timeInterval: 1 })
     );
 
-    // register regions plugin explicitly and keep a reference
     regionsPlugin = wavesurfer.registerPlugin(
         WaveSurfer.Regions.create()
     );
@@ -85,6 +81,12 @@ document.getElementById("sub-input").addEventListener("change", (e) => {
         attachTrackToVideo(text);
         renderSubs(subtitles);
         renderWaveformRegions(subtitles);
+
+        // Show editor but clear fields
+        const editor = document.getElementById("editor");
+        editor.style.display = "flex";
+        editor.dataset.index = "";
+        document.getElementById("edit-text").value = "";
     };
     reader.readAsText(file);
 });
@@ -244,13 +246,37 @@ function bindWaveformEvents() {
         highlightRow(region.data?.index ?? 0);
     });
 
+    // Listen for region updates (drag/resize)
+    regionsPlugin.on('region-updated', (region) => {
+        const idx = region.data?.index;
+        if (typeof idx === "number" && subtitles[idx]) {
+            // Update subtitle start/end times
+            const start = region.start;
+            const end = region.end;
+
+            // Format to VTT time (hh:mm:ss.mmm)
+            subtitles[idx].start = formatTimeVTT(start);
+            subtitles[idx].end = formatTimeVTT(end);
+            subtitles[idx].duration = computeVTTDuration(subtitles[idx].start, subtitles[idx].end);
+
+            renderSubs(subtitles);
+            updateVideoTrack();
+
+            // If this region is currently selected in the editor, update the editor fields
+            const editor = document.getElementById("editor");
+            if (editor.dataset.index == idx) {
+                // Only update if the editor is showing this cue
+                document.getElementById("edit-text").value = subtitles[idx].text;
+            }
+        }
+    });
+
     const video = document.getElementById("video");
     video.addEventListener('timeupdate', () => {
         if (!wavesurfer) return;
         const ratio = video.currentTime / video.duration;
         wavesurfer.seekTo(ratio);
 
-        // Highlight the current region's row
         const regions = regionsPlugin.getRegions();
         const currentRegion = regions.find(r =>
             video.currentTime >= r.start && video.currentTime < r.end
@@ -258,40 +284,105 @@ function bindWaveformEvents() {
         if (currentRegion && typeof currentRegion.data?.index === "number") {
             highlightRow(currentRegion.data.index);
         } else {
-            highlightRow(-1); // Remove highlight if not in any region
+            // Only clear highlight if video is playing
+            if (!video.paused) {
+                highlightRow(-1);
+            }
         }
     });
 }
 
+// Helper to format seconds to VTT time string
+function formatTimeVTT(seconds) {
+    const ms = Math.floor((seconds % 1) * 1000);
+    const totalSeconds = Math.floor(seconds);
+    const s = totalSeconds % 60;
+    const m = Math.floor((totalSeconds / 60) % 60);
+    const h = Math.floor(totalSeconds / 3600);
+    return (
+        String(h).padStart(2, "0") + ":" +
+        String(m).padStart(2, "0") + ":" +
+        String(s).padStart(2, "0") + "." +
+        String(ms).padStart(3, "0")
+    );
+}
+
 
 /* --------------------------------------------------
-   Row Interaction
+   Row Interaction + Editing
 -------------------------------------------------- */
 
 function onRowClick(index) {
     highlightRow(index);
 
-    if (!regionsPlugin) return;
+    const editor = document.getElementById("editor");
+    editor.style.display = "flex";
+    editor.dataset.index = index;
+
+    const cue = subtitles[index];
+
+    document.getElementById("edit-text").value = cue.text;
 
     const regions = regionsPlugin.getRegions();
     const region = regions.find(r => r.data && r.data.index === index);
 
     if (region) {
         const video = document.getElementById("video");
-
         const wasPlaying = !video.paused;
-
         video.currentTime = region.start;
-
-        if (wasPlaying) {
-            video.play();
-        }
+        if (wasPlaying) video.play();
     }
 }
 
+document.getElementById("save-edit").addEventListener("click", () => {
+    const editor = document.getElementById("editor");
+    const index = parseInt(editor.dataset.index);
+
+    const newText = document.getElementById("edit-text").value.trim();
+
+    subtitles[index].text = newText;
+
+    renderSubs(subtitles);
+    renderWaveformRegions(subtitles);
+    updateVideoTrack();
+
+});
+
+document.getElementById("cancel-edit").addEventListener("click", () => {
+    document.getElementById("editor").style.display = "none";
+});
+
+
+/* --------------------------------------------------
+   VTT Regeneration (after edits)
+-------------------------------------------------- */
+
+function updateVideoTrack() {
+    const vttText =
+        "WEBVTT\n\n" +
+        subtitles.map(cue =>
+            `${cue.start} --> ${cue.end}\n${cue.text}\n`
+        ).join("\n");
+
+    attachTrackToVideo(vttText);
+}
+
+
+/* --------------------------------------------------
+   Row Highlight
+-------------------------------------------------- */
 
 function highlightRow(i) {
     const rows = document.querySelectorAll("#subs-body tr");
     rows.forEach(r => r.classList.remove("active-row"));
     if (rows[i]) rows[i].classList.add("active-row");
+
+    const editor = document.getElementById("editor");
+    if (i >= 0 && subtitles[i]) {
+        editor.dataset.index = i;
+        document.getElementById("edit-text").value = subtitles[i].text;
+    } else {
+        editor.dataset.index = "";
+        document.getElementById("edit-text").value = "";
+    }
 }

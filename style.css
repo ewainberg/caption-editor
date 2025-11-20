@@ -97,3 +97,22 @@ body {
     background: #2a4a7a !important;
     color: #fff;
 }
+
+#editor {
+    padding: 10px;
+    background: #222;
+    border-top: 1px solid #444;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#editor label {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+}
+
+#edit-text {
+    height: 60px;
+}
