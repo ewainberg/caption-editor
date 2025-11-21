@@ -335,10 +335,7 @@ document.getElementById("cancel-edit").addEventListener("click", () => {
 });
 
 
-/* --------------------------------------------------
-   VTT Regeneration (after edits)
--------------------------------------------------- */
-
+// Refresh VTT (after updates)
 function updateVideoTrack() {
     const vttText =
         "WEBVTT\n\n" +
@@ -422,7 +419,6 @@ window.addEventListener("DOMContentLoaded", () => {
         if (!video.duration) return;
 
         const delta = e.deltaY < 0 ? 1 : -1;
-        // Seek by 1 second per scroll "tick"
         let newTime = video.currentTime + delta * 0.2;
         newTime = Math.max(0, Math.min(video.duration, newTime));
         video.currentTime = newTime;
@@ -468,7 +464,8 @@ window.addEventListener("DOMContentLoaded", () => {
         const video = document.getElementById("video");
 
         if (stopAtEndHandler) {
-            video.removeEventListener("timeupdate", stopAtEndHandler);
+            cancelAnimationFrame(stopAtEndHandler);
+            stopAtEndHandler = null;
         }
 
         // Always start at the section's start
@@ -481,14 +478,82 @@ window.addEventListener("DOMContentLoaded", () => {
 
         video.play();
 
-        stopAtEndHandler = function stopAtEnd() {
+        function checkEnd() {
             if (video.currentTime >= end) {
                 video.pause();
-                video.removeEventListener("timeupdate", stopAtEndHandler);
+                video.currentTime = end;
                 stopAtEndHandler = null;
+            } else {
+                stopAtEndHandler = requestAnimationFrame(checkEnd);
             }
+        }
+        stopAtEndHandler = requestAnimationFrame(checkEnd);
+    });
+
+    // Insert Button logic
+    const insertBtn = document.getElementById("insert");
+    insertBtn.addEventListener("click", () => {
+        const video = document.getElementById("video");
+        if (!video || !subtitles.length) return;
+
+        const currentTime = video.currentTime;
+        const defaultDuration = 1.0; // seconds
+
+        // Find the index to insert at: first region whose start is after currentTime
+        let insertAt = subtitles.findIndex(
+            cue => vttToMS(cue.start) / 1000 > currentTime
+        );
+        if (insertAt === -1) insertAt = subtitles.length; // append at end
+
+        // Set new cue times
+        const newStart = currentTime;
+        const newEnd = Math.min(newStart + defaultDuration, video.duration || newStart + defaultDuration);
+
+        function formatVTTTime(sec) {
+            const ms = Math.floor((sec % 1) * 1000);
+            const totalSeconds = Math.floor(sec);
+            const s = totalSeconds % 60;
+            const m = Math.floor((totalSeconds / 60) % 60);
+            const h = Math.floor(totalSeconds / 3600);
+            return (
+                String(h).padStart(2, "0") + ":" +
+                String(m).padStart(2, "0") + ":" +
+                String(s).padStart(2, "0") + "." +
+                String(ms).padStart(3, "0")
+            );
+        }
+
+        const newCue = {
+            index: subtitles.length + 1,
+            id: null,
+            start: formatVTTTime(newStart),
+            end: formatVTTTime(newEnd),
+            duration: (newEnd - newStart).toFixed(3),
+            text: ""
         };
-        video.addEventListener("timeupdate", stopAtEndHandler);
+
+        // Optionally, push all following cues forward by defaultDuration
+        for (let i = insertAt; i < subtitles.length; i++) {
+            let cue = subtitles[i];
+            let cueStart = vttToMS(cue.start) / 1000 + defaultDuration;
+            let cueEnd = vttToMS(cue.end) / 1000 + defaultDuration;
+            cue.start = formatVTTTime(cueStart);
+            cue.end = formatVTTTime(cueEnd);
+            cue.duration = (cueEnd - cueStart).toFixed(3);
+        }
+
+        // Insert at the calculated position
+        subtitles.splice(insertAt, 0, newCue);
+
+        // Re-index cues
+        subtitles.forEach((cue, i) => cue.index = i + 1);
+
+        renderSubs(subtitles);
+        renderWaveformRegions(subtitles);
+        updateVideoTrack();
+
+        // Select and open editor for new cue
+        selectSection(insertAt);
     });
 
     document.getElementById("video").removeAttribute("controls");

@@ -77,6 +77,10 @@ body {
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 #subtitle-table th {
