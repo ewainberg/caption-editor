@@ -203,6 +203,17 @@ function renderSubs(entries) {
         tr.addEventListener("click", () => {
             selectSection(i);
         });
+
+        // Add double-click to seek video/waveform to cue start
+        tr.addEventListener("dblclick", () => {
+            const start = vttToMS(e.start) / 1000;
+            const video = document.getElementById("video");
+            video.currentTime = start;
+            if (wavesurfer && video.duration) {
+                wavesurfer.seekTo(start / video.duration);
+            }
+        });
+
         body.appendChild(tr);
     });
 }
