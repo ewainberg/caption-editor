@@ -3,6 +3,7 @@ body {
     background: #1a1a1a;
     font-family: sans-serif;
     color: white;
+    overflow-y: hidden;
 }
 
 #app {
@@ -81,6 +82,9 @@ body {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+    max-height: 400px;
+    display: block;
+    overflow-y: auto;
 }
 
 #subtitle-table th {
@@ -131,4 +135,15 @@ body {
 
 #edit-text {
     height: 60px;
+}
+
+.input-error {
+    border: 2px solid red;
+    background: #ffeaea;
+}
+
+#subs-error {
+    color: red;
+    margin-top: 4px;
+    min-height: 18px;
 }

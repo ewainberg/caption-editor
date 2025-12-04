@@ -194,8 +194,8 @@ function renderSubs(entries) {
 
         tr.innerHTML = `
             <td>${e.index}</td>
-            <td>${e.start}</td>
-            <td>${e.end}</td>
+            <td><input type="text" class="start-input" value="${e.start}" data-index="${i}" style="width:90px"></td>
+            <td><input type="text" class="end-input" value="${e.end}" data-index="${i}" style="width:90px"></td>
             <td>${e.duration}</td>
             <td>${e.text}</td>
         `;
@@ -204,7 +204,6 @@ function renderSubs(entries) {
             selectSection(i);
         });
 
-        // Add double-click to seek video/waveform to cue start
         tr.addEventListener("dblclick", () => {
             const start = vttToMS(e.start) / 1000;
             const video = document.getElementById("video");
@@ -215,6 +214,41 @@ function renderSubs(entries) {
         });
 
         body.appendChild(tr);
+    });
+
+    // Add listeners for start/end input changes
+    body.querySelectorAll(".start-input, .end-input").forEach(input => {
+        input.addEventListener("change", (e) => {
+            const idx = parseInt(input.dataset.index);
+            const cue = subtitles[idx];
+            let newStart = cue.start;
+            let newEnd = cue.end;
+
+            if (input.classList.contains("start-input")) {
+                newStart = input.value;
+            } else {
+                newEnd = input.value;
+            }
+
+            const errorDiv = document.getElementById("subs-error");
+            if (vttToMS(newStart) >= vttToMS(newEnd)) {
+                input.classList.add("input-error");
+                errorDiv.textContent = "Start time must be less than end time.";
+                input.focus();
+                return;
+            } else {
+                input.classList.remove("input-error");
+                errorDiv.textContent = "";
+            }
+
+            cue.start = newStart;
+            cue.end = newEnd;
+            cue.duration = computeVTTDuration(cue.start, cue.end);
+
+            renderSubs(subtitles);
+            renderWaveformRegions(subtitles);
+            updateVideoTrack();
+        });
     });
 }
 
@@ -505,20 +539,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const insertBtn = document.getElementById("insert");
     insertBtn.addEventListener("click", () => {
         const video = document.getElementById("video");
-        if (!video || !subtitles.length) return;
+        if (!video) return;
 
         const currentTime = video.currentTime;
-        const defaultDuration = 1.0; // seconds
-
-        // Find the index to insert at: first region whose start is after currentTime
-        let insertAt = subtitles.findIndex(
-            cue => vttToMS(cue.start) / 1000 > currentTime
-        );
-        if (insertAt === -1) insertAt = subtitles.length; // append at end
-
-        // Set new cue times
-        const newStart = currentTime;
-        const newEnd = Math.min(newStart + defaultDuration, video.duration || newStart + defaultDuration);
+        const defaultDuration = 1.0;
 
         function formatVTTTime(sec) {
             const ms = Math.floor((sec % 1) * 1000);
@@ -534,8 +558,43 @@ window.addEventListener("DOMContentLoaded", () => {
             );
         }
 
+        let insertAt = 0;
+        let newStart = 0;
+
+        if (selectedIndex !== -1 && subtitles[selectedIndex]) {
+            const cue = subtitles[selectedIndex];
+            newStart = vttToMS(cue.end) / 1000;
+            insertAt = selectedIndex + 1;
+        }
+
+        else {
+            // Find the cue that the playhead is inside
+            const insideIndex = subtitles.findIndex(cue => {
+                const s = vttToMS(cue.start) / 1000;
+                const e = vttToMS(cue.end) / 1000;
+                return currentTime >= s && currentTime <= e;
+            });
+
+            if (insideIndex !== -1) {
+                // Inside a cue, insert after it
+                const cue = subtitles[insideIndex];
+                newStart = vttToMS(cue.end) / 1000;
+                insertAt = insideIndex + 1;
+            } else {
+                // Playhead in a gap, insert at playhead position
+                newStart = currentTime;
+
+                insertAt = subtitles.findIndex(
+                    cue => vttToMS(cue.start) / 1000 > currentTime
+                );
+                if (insertAt === -1) insertAt = subtitles.length;
+            }
+        }
+
+        const newEnd = Math.min(newStart + defaultDuration, video.duration);
+
         const newCue = {
-            index: subtitles.length + 1,
+            index: 0,
             id: null,
             start: formatVTTTime(newStart),
             end: formatVTTTime(newEnd),
@@ -543,28 +602,49 @@ window.addEventListener("DOMContentLoaded", () => {
             text: ""
         };
 
-        // Optionally, push all following cues forward by defaultDuration
-        for (let i = insertAt; i < subtitles.length; i++) {
-            let cue = subtitles[i];
-            let cueStart = vttToMS(cue.start) / 1000 + defaultDuration;
-            let cueEnd = vttToMS(cue.end) / 1000 + defaultDuration;
-            cue.start = formatVTTTime(cueStart);
-            cue.end = formatVTTTime(cueEnd);
-            cue.duration = (cueEnd - cueStart).toFixed(3);
+        const nextCue = subtitles[insertAt];
+
+        if (nextCue) {
+            const nextStart = vttToMS(nextCue.start) / 1000;
+            const nextEnd   = vttToMS(nextCue.end)   / 1000;
+
+            if (nextStart < newEnd) {
+                const trimmedStart = newEnd;
+
+                if (trimmedStart >= nextEnd) {
+                    subtitles.splice(insertAt, 1);
+                } else {
+                    nextCue.start = formatVTTTime(trimmedStart);
+                    nextCue.duration = (nextEnd - trimmedStart).toFixed(3);
+                }
+            }
         }
 
-        // Insert at the calculated position
         subtitles.splice(insertAt, 0, newCue);
-
-        // Re-index cues
         subtitles.forEach((cue, i) => cue.index = i + 1);
 
         renderSubs(subtitles);
         renderWaveformRegions(subtitles);
         updateVideoTrack();
-
-        // Select and open editor for new cue
         selectSection(insertAt);
+    });
+
+
+    const deleteBtn = document.getElementById("delete");
+    deleteBtn.addEventListener("click", () => {
+        if (selectedIndex < 0 || !subtitles[selectedIndex]) return;
+
+        subtitles.splice(selectedIndex, 1);
+
+        subtitles.forEach((cue, i) => cue.index = i + 1);
+
+        selectedIndex = -1;
+
+        renderSubs(subtitles);
+        renderWaveformRegions(subtitles);
+        updateVideoTrack();
+
+        document.getElementById("editor").style.display = "none";
     });
 
     document.getElementById("video").removeAttribute("controls");
