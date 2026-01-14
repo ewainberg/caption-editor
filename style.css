@@ -134,7 +134,8 @@ body {
 }
 
 #edit-text {
-    height: 60px;
+    height: 120px;
+    resize: vertical;
 }
 
 .input-error {

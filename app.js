@@ -375,10 +375,6 @@ document.getElementById("save-edit").addEventListener("click", () => {
 
 });
 
-document.getElementById("cancel-edit").addEventListener("click", () => {
-    document.getElementById("editor").style.display = "none";
-});
-
 
 // Refresh VTT (after updates)
 function updateVideoTrack() {
@@ -474,6 +470,40 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     }, { passive: false });
 
+    // Seek buttons
+    const seekLeftBtn = document.getElementById("seek-left");
+    const seekRightBtn = document.getElementById("seek-right");
+
+    seekLeftBtn.addEventListener("click", () => {
+        const video = document.getElementById("video");
+        if (!video.duration) return;
+        let newTime = Math.max(0, video.currentTime - 1);
+        video.currentTime = newTime;
+        if (wavesurfer && video.duration) {
+            wavesurfer.seekTo(newTime / video.duration);
+        }
+
+        if (video.paused) {
+            video.play();
+            setTimeout(() => video.pause(), 50);
+        }
+    });
+
+    seekRightBtn.addEventListener("click", () => {
+        const video = document.getElementById("video");
+        if (!video.duration) return;
+        let newTime = Math.min(video.duration, video.currentTime + 1);
+        video.currentTime = newTime;
+        if (wavesurfer && video.duration) {
+            wavesurfer.seekTo(newTime / video.duration);
+        }
+
+        if (video.paused) {
+            video.play();
+            setTimeout(() => video.pause(), 50);
+        }
+    });
+
     // Play/Pause button logic
     const video = document.getElementById("video");
     const playPauseBtn = document.getElementById("play-pause-btn");
@@ -513,7 +543,6 @@ window.addEventListener("DOMContentLoaded", () => {
             stopAtEndHandler = null;
         }
 
-        // Always start at the section's start
         video.currentTime = start;
 
         // Sync waveform immediately
