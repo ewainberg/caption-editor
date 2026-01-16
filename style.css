@@ -14,26 +14,41 @@ body {
 
 #main-panels {
     display: grid;
-    grid-template-columns: 45% 55%;
+    grid-template-columns: 60% 40%;
     flex: 1;
 }
 
 #left-panel {
     overflow-y: auto;
+    width: 100%;
+    box-sizing: border-box;
     border-right: 1px solid #333;
 }
 
 #right-panel {
     display: flex;
     flex-direction: column;
+    height: 100%;
+    min-height: 0;
 }
 
 #video-container {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
     background: black;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+#video-container video,
+#video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    background: black;
 }
 
 #controls {
@@ -77,13 +92,14 @@ body {
 #subtitle-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    border-spacing: 15px 0px;
+    font-size: 18px;
     user-select: none;
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
-    max-height: 400px;
-    display: block;
+    max-height: 450px;
+    display: inline-table;
     overflow-y: auto;
 }
 

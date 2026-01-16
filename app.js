@@ -83,12 +83,6 @@ document.getElementById("sub-input").addEventListener("change", (e) => {
         attachTrackToVideo(text);
         renderSubs(subtitles);
         renderWaveformRegions(subtitles);
-
-        // Show editor but clear fields
-        const editor = document.getElementById("editor");
-        editor.style.display = "flex";
-        editor.dataset.index = "";
-        document.getElementById("edit-text").value = "";
     };
     reader.readAsText(file);
 });
@@ -140,7 +134,21 @@ function parseVTT(data) {
 
         if (!line?.includes("-->")) { i++; continue; }
 
-        const [start, end] = line.split("-->").map(s => s.trim());
+        // Parse cue settings
+        const [start, rest] = line.split("-->").map(s => s.trim());
+        let end = rest;
+        let position = 50;
+        let align = "center";
+        const settingsMatch = rest.match(/([0-9:.]+)\s+(.*)/);
+        if (settingsMatch) {
+            end = settingsMatch[1];
+            const settings = settingsMatch[2].split(/\s+/);
+            settings.forEach(s => {
+                if (s.startsWith("position:")) position = parseInt(s.split(":")[1]);
+                if (s.startsWith("align:")) align = s.split(":")[1];
+            });
+        }
+
         i++;
 
         let text = "";
@@ -154,7 +162,9 @@ function parseVTT(data) {
             start,
             end,
             duration: computeVTTDuration(start, end),
-            text
+            text,
+            position,
+            align
         });
     }
 
@@ -197,7 +207,14 @@ function renderSubs(entries) {
             <td><input type="text" class="start-input" value="${e.start}" data-index="${i}" style="width:90px"></td>
             <td><input type="text" class="end-input" value="${e.end}" data-index="${i}" style="width:90px"></td>
             <td>${e.duration}</td>
-            <td>${e.text}</td>
+            <td>
+                <input type="text" class="text-input" value="${e.text.replace(/"/g, '&quot;')}" data-index="${i}" style="width:98%; font-size:18px">
+            </td>
+            <td style="text-align:center;">
+                <button class="align-btn" data-pos="0" data-align="start" data-index="${i}" ${e.position === 0 ? 'style="font-weight:bold"' : ""}>L</button>
+                <button class="align-btn" data-pos="50" data-align="center" data-index="${i}" ${e.position === 50 ? 'style="font-weight:bold"' : ""}>C</button>
+                <button class="align-btn" data-pos="100" data-align="end" data-index="${i}" ${e.position === 100 ? 'style="font-weight:bold"' : ""}>R</button>
+            </td>
         `;
 
         tr.addEventListener("click", () => {
@@ -245,6 +262,39 @@ function renderSubs(entries) {
             cue.end = newEnd;
             cue.duration = computeVTTDuration(cue.start, cue.end);
 
+            renderSubs(subtitles);
+            renderWaveformRegions(subtitles);
+            updateVideoTrack();
+        });
+    });
+
+    // Add listener for text input autosave
+    body.querySelectorAll(".text-input").forEach(input => {
+        input.addEventListener("blur", (e) => {
+            const idx = parseInt(input.dataset.index);
+            const cue = subtitles[idx];
+            const newText = input.value.trim();
+            if (cue.text !== newText) {
+                cue.text = newText;
+                renderSubs(subtitles);
+                renderWaveformRegions(subtitles);
+                updateVideoTrack();
+            }
+        });
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                input.blur();
+            }
+        });
+    });
+
+    body.querySelectorAll(".align-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const idx = parseInt(btn.dataset.index);
+            const pos = parseInt(btn.dataset.pos);
+            const align = btn.dataset.align;
+            subtitles[idx].position = pos;
+            subtitles[idx].align = align;
             renderSubs(subtitles);
             renderWaveformRegions(subtitles);
             updateVideoTrack();
@@ -342,13 +392,7 @@ function formatTimeVTT(seconds) {
 function onRowClick(index) {
     highlightRow(index);
 
-    const editor = document.getElementById("editor");
-    editor.style.display = "flex";
-    editor.dataset.index = index;
-
     const cue = subtitles[index];
-
-    document.getElementById("edit-text").value = cue.text;
 
     const regions = regionsPlugin.getRegions();
     const region = regions.find(r => r.data && r.data.index === index);
@@ -361,27 +405,13 @@ function onRowClick(index) {
     }
 }
 
-document.getElementById("save-edit").addEventListener("click", () => {
-    const editor = document.getElementById("editor");
-    const index = parseInt(editor.dataset.index);
-
-    const newText = document.getElementById("edit-text").value.trim();
-
-    subtitles[index].text = newText;
-
-    renderSubs(subtitles);
-    renderWaveformRegions(subtitles);
-    updateVideoTrack();
-
-});
-
 
 // Refresh VTT (after updates)
 function updateVideoTrack() {
     const vttText =
         "WEBVTT\n\n" +
         subtitles.map(cue =>
-            `${cue.start} --> ${cue.end}\n${cue.text}\n`
+            `${cue.start} --> ${cue.end} position:${cue.position}% align:${cue.align}\n${cue.text}\n`
         ).join("\n");
 
     attachTrackToVideo(vttText);
@@ -421,10 +451,6 @@ function selectSection(index, seekTime) {
             video.pause();
         }
     }
-    const editor = document.getElementById("editor");
-    editor.style.display = "flex";
-    editor.dataset.index = index;
-    document.getElementById("edit-text").value = subtitles[index].text;
 }
 
 // For testing purposes, load default video and subtitles on startup
@@ -445,11 +471,6 @@ window.addEventListener("DOMContentLoaded", () => {
             attachTrackToVideo(text);
             renderSubs(subtitles);
             renderWaveformRegions(subtitles);
-
-            const editor = document.getElementById("editor");
-            editor.style.display = "flex";
-            editor.dataset.index = "";
-            document.getElementById("edit-text").value = "";
         });
 
     // Add mouse wheel seeking on waveform
@@ -673,7 +694,6 @@ window.addEventListener("DOMContentLoaded", () => {
         renderWaveformRegions(subtitles);
         updateVideoTrack();
 
-        document.getElementById("editor").style.display = "none";
     });
 
     document.getElementById("video").removeAttribute("controls");
