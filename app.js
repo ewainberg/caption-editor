@@ -307,7 +307,7 @@ function renderSubs(entries) {
    Waveform Region Rendering
 -------------------------------------------------- */
 
-function renderWaveformRegions(entries) {
+function renderWaveformRegions(entries, focusIndex = null) {
     if (!wavesurfer || !regionsPlugin) return;
 
     regionsPlugin.clearRegions();
@@ -329,10 +329,22 @@ function renderWaveformRegions(entries) {
 
         region.data = { index: i };
 
-        region.on("dblclick", (e) => {
-            console.log("double click fired!", region);
+        // Directly set accessibility and identifier attributes
+        if (region.element) {
+            region.element.setAttribute("data-region-id", "sub_" + i);
+            region.element.setAttribute("role", "button");
+            region.element.setAttribute("aria-label", `Subtitle region ${i + 1}: ${cue.text}`);
 
-            // Calculate the time at the double-click position
+            region.element.onkeydown = null;
+            region.element.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    selectSection(i, start);
+                    e.preventDefault();
+                }
+            });
+        }
+
+        region.on("dblclick", (e) => {
             let seekTime = region.start;
             if (e && wavesurfer) {
                 const bbox = wavesurfer.getWrapper().getBoundingClientRect();
@@ -347,6 +359,49 @@ function renderWaveformRegions(entries) {
             selectSection(i, seekTime);
         });
     });
+
+    // Pass focusIndex to keep focus after re-render
+    renderRegionAccessList(entries, focusIndex);
+}
+
+
+/* --------------------------------------------------
+   Region Access List Rendering
+-------------------------------------------------- */
+
+function renderRegionAccessList(entries, focusIndex = null) {
+    const list = document.getElementById("region-access-list");
+    list.innerHTML = "";
+    entries.forEach((cue, i) => {
+        const li = document.createElement("li");
+        li.tabIndex = 0;
+        li.setAttribute("role", "button");
+        li.setAttribute("aria-label", `Subtitle region ${i + 1}: ${cue.text}`);
+
+        li.addEventListener("focus", () => {
+            if (wavesurfer && wavesurfer.getDuration()) {
+                const startSec = vttToMS(cue.start) / 1000;
+                wavesurfer.seekTo(startSec / wavesurfer.getDuration());
+            }
+        });
+
+        li.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                selectSection(i, vttToMS(cue.start) / 1000);
+                e.preventDefault();
+            }
+        });
+        li.addEventListener("click", () => {
+            selectSection(i, vttToMS(cue.start) / 1000);
+        });
+        li.textContent = `#${i + 1} ${cue.text}`;
+        list.appendChild(li);
+    });
+
+    // Restore focus if needed
+    if (focusIndex !== null && list.children[focusIndex]) {
+        list.children[focusIndex].focus();
+    }
 }
 
 
@@ -431,7 +486,7 @@ function highlightRow(i) {
 function selectSection(index, seekTime) {
     selectedIndex = index;
     highlightRow(index);
-    renderWaveformRegions(subtitles);
+    renderWaveformRegions(subtitles, index);
 
     // Only seek if seekTime is provided (from region double-click)
     if (typeof seekTime === "number") {
@@ -485,7 +540,6 @@ window.addEventListener("DOMContentLoaded", () => {
         newTime = Math.max(0, Math.min(video.duration, newTime));
         video.currentTime = newTime;
 
-        // Sync waveform playhead
         if (wavesurfer) {
             wavesurfer.seekTo(newTime / video.duration);
         }
