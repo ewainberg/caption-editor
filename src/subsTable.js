@@ -17,12 +17,12 @@ export function renderSubs(entries) {
 
     tr.innerHTML = `
       <td>${e.index}</td>
-      <td><input type="text" class="start-input" value="${e.start}" data-index="${i}" style="width:90px"></td>
-      <td><input type="text" class="end-input" value="${e.end}" data-index="${i}" style="width:90px"></td>
-      <td>${e.duration}</td>
       <td>
         <input type="text" class="text-input" value="${e.text.replace(/"/g, "&quot;")}" data-index="${i}" style="width:98%; font-size:18px">
       </td>
+      <td><input type="text" class="start-input" value="${e.start}" data-index="${i}" style="width:90px"></td>
+      <td><input type="text" class="end-input" value="${e.end}" data-index="${i}" style="width:90px"></td>
+      <td>${e.duration}</td>
       <td style="text-align:center;">
         <button class="align-btn" data-pos="0" data-align="start" data-index="${i}" ${e.position === 0 ? 'style="font-weight:bold"' : ""}>L</button>
         <button class="align-btn" data-pos="50" data-align="center" data-index="${i}" ${e.position === 50 ? 'style="font-weight:bold"' : ""}>C</button>
@@ -118,7 +118,7 @@ export function renderSubs(entries) {
   });
 
   // Alignment buttons
-  body.querySelectorAll(".align-btn").forEach(btn => {
+    body.querySelectorAll(".align-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = parseInt(btn.dataset.index, 10);
       const pos = parseInt(btn.dataset.pos, 10);
@@ -128,6 +128,21 @@ export function renderSubs(entries) {
       renderSubs(state.subtitles);
       renderWaveformRegions(state.subtitles);
       updateVideoTrack();
+  
+      // Restore focus to the same button after re-render
+      setTimeout(() => {
+        const selector = `.align-btn[data-index="${idx}"][data-pos="${pos}"][data-align="${align}"]`;
+        const newBtn = document.querySelector(selector);
+        if (newBtn) newBtn.focus();
+      }, 0);
+    });
+  
+    // Optional: handle Enter/Space for keyboard accessibility
+    btn.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        btn.click();
+        e.preventDefault();
+      }
     });
   });
 }
