@@ -96,11 +96,28 @@ export function renderSubs(entries) {
     });
 
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") input.blur();
+      const idx = parseInt(input.dataset.index, 10);
+      if (e.key === "Enter") {
+        input.blur();
+        // Restore focus to the corresponding region in the access list and waveform region
+        setTimeout(() => {
+          const regionList = document.getElementById("region-access-list");
+          if (regionList && regionList.children[idx]) {
+            regionList.children[idx].focus();
+            // Also focus the waveform region element
+            if (state.regionsPlugin) {
+              const region = state.regionsPlugin.getRegions().find(r => r.data?.index === idx);
+              if (region && region.element && typeof region.element.focus === "function") {
+                region.element.focus();
+              }
+            }
+          }
+        }, 0);
+      }
     });
   });
 
-  // Align buttons
+  // Alignment buttons
   body.querySelectorAll(".align-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = parseInt(btn.dataset.index, 10);

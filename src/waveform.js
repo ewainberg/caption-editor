@@ -75,12 +75,29 @@ export function renderRegionAccessList(entries, focusIndex = null) {
       if (state.wavesurfer && state.wavesurfer.getDuration()) {
         const startSec = vttToMS(cue.start) / 1000;
         state.wavesurfer.seekTo(startSec / state.wavesurfer.getDuration());
+        // Sync video currentTime as well
+        const video = document.getElementById("video");
+        if (video && video.duration) {
+          video.currentTime = startSec;
+        }
+        // Only focus the region element when the access list item is focused
+        if (state.regionsPlugin) {
+          const region = state.regionsPlugin.getRegions().find(r => r.data?.index === i);
+          if (region && region.element && typeof region.element.focus === "function") {
+            region.element.focus();
+          }
+        }
       }
     });
 
     li.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         selectSection(i, vttToMS(cue.start) / 1000);
+        setTimeout(() => {
+          // Focus the corresponding text input in the table
+          const textInput = document.querySelector(`.text-input[data-index="${i}"]`);
+          if (textInput) textInput.focus();
+        }, 0);
         e.preventDefault();
       }
     });
@@ -93,7 +110,12 @@ export function renderRegionAccessList(entries, focusIndex = null) {
     list.appendChild(li);
   });
 
-  if (focusIndex !== null && list.children[focusIndex]) {
+  // Only restore focus if the access list itself had focus before
+  if (
+    focusIndex !== null &&
+    document.activeElement === list &&
+    list.children[focusIndex]
+  ) {
     list.children[focusIndex].focus();
   }
 }
